@@ -15,7 +15,7 @@ import trimesh
 ###############################################################################
 # 0. 경로 설정 ---------------------------------------------------------------
 ###############################################################################
-DATA_ROOT   = pathlib.Path("/datasets/scene_datasets/replica_cad_dataset/")                    # HF repo root
+DATA_ROOT   = pathlib.Path("/dataset/scene_datasets/replica_cad_dataset/")                    # HF repo root
 SCENE_DIR   = DATA_ROOT / "configs" / "scenes"
 OBJECT_DIR  = DATA_ROOT / "configs" / "objects"
 
@@ -31,7 +31,7 @@ _AX_SWAP = np.array([[1,  0,  0],
 def hab2gen_pos(pos_xyz: list[float]) -> tuple[float, float, float]:
     """(x, y, z)_Hab → (x, y', z')_Gen"""
     x, y, z = pos_xyz
-    return  (x, -z, y) # (x, -z, y)
+    return  (x, -z, y + 0.3) # (x, -z, y)
 
 def hab2gen_quat(q) -> tuple[float, float, float, float]:
     """
@@ -119,15 +119,27 @@ def load_replicacad(scene_json: pathlib.Path,
     scene.add_entity(
         morph=gs.morphs.Mesh(
             file=str(stage_glb),
-            pos=[0.0, 0.0, 0.0],            # ← 변환 후 좌표
+            pos=[0.0, 0.0, 0.1],            # ← 변환 후 좌표
             euler=[90.0, 0.0, 0.0],         # ← 변환 후 쿼터니언
             fixed=True, 
             collision=True,
             visualization=True,
-            convexify=False
+            convexify=False,
+            # decimate_face_num = 10000
         ),
+            visualize_contact=True
         # vis_mode="collision"
     )
+    
+    # box = scene.add_entity(
+    #     gs.morphs.Box(
+    #         pos=(0.0, 0.0, 6.5),
+    #         size=(30.0, 30.0, 0.1),
+    #         fixed=False
+    #     ),
+    #     material=gs.materials.Rigid(rho=0.1, friction=0.8),
+    #     visualize_contact=True,
+    # )
     
     # floor = scene.add_entity(
     #     gs.morphs.Box(
@@ -137,13 +149,18 @@ def load_replicacad(scene_json: pathlib.Path,
     #         fixed=True, collision=True, visualization=False
     #     )
     # )
-    scene.add_entity(gs.morphs.URDF(file="urdf/plane/plane.urdf", fixed=True))
+    scene.add_entity(gs.morphs.URDF(file="urdf/plane/plane.urdf", fixed=True),
+                     visualize_contact=False
+    )  # 바닥: URDF로 추가, 고정체
     
     # ────────── Objects ──────────
-    # idx = 0
+    idx = 0
     count_non_collision = 0
     for obj in inst["object_instances"]:
         tname = obj["template_name"]                      # 'objects/xxx'
+        if "frl_apartment_bike_0" in tname:
+            continue
+        
         cfg   = load_obj_cfg(tname)
         
         vis_glb = DATA_ROOT / "configs/objects" / cfg["render_asset"]         # 시각 메시
@@ -158,7 +175,7 @@ def load_replicacad(scene_json: pathlib.Path,
             scene.add_entity(
                 gs.morphs.Mesh(
                     file=str(vis_glb),
-                    pos=pos, quat=quat, fixed=True,
+                    pos=pos, quat=quat, fixed=False,
                     visualization=True, collision=True,
                     convexify=False
                 )
@@ -169,7 +186,7 @@ def load_replicacad(scene_json: pathlib.Path,
                 gs.morphs.Mesh(
                     file=str(vis_glb),
                     pos=pos, quat=quat, 
-                    fixed=True,
+                    fixed=False,
                     visualization=True, 
                     collision=True,
                     coacd_options=gs.options.CoacdOptions(
@@ -178,6 +195,11 @@ def load_replicacad(scene_json: pathlib.Path,
                     )
                 ),
             )
+  
+        idx += 1
+        # if idx == 1:  # 첫 5개만 로드
+        #     break
+  
     
     for aobj in inst["articulated_object_instances"]:
         template_name = aobj["template_name"]
@@ -196,7 +218,7 @@ def load_replicacad(scene_json: pathlib.Path,
             gs.morphs.URDF(
                 file=urdf_path,
                 pos=pos, quat=quat,
-                fixed=True,
+                fixed=False,
                 collision=True,
                 visualization=True,
                 scale=scale,
@@ -211,7 +233,7 @@ def load_replicacad(scene_json: pathlib.Path,
     #         euler=[0.0, 0.0, 0.0]
     #     ),
     # )
-    print("Number of Non-Collisionable Dynamic Objects:", count_non_collision)
+    # print("Number of Non-Collisionable Dynamic Objects:", count_non_collision)
     scene.build()                                         # ★필수: 시뮬 초기화
     return scene
 
@@ -226,3 +248,4 @@ if __name__ == "__main__":
     print("Genesis + ReplicaCAD 장면 로드 완료! 창을 닫으면 종료됩니다.")
     while True:
         scene.step()
+        input()

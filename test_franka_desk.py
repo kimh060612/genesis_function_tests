@@ -39,7 +39,7 @@ cube = scene.add_entity(
 )
 desk = scene.add_entity(
     morph=gs.morphs.Mesh(
-        file="./data/desk/MyScriptedDesk.obj",
+        file="/dataset/mesh/desk/MyScriptedDesk.obj",
         euler=(0., 0., 0.),
         scale=0.5,
         pos=(0.7, 0.3, 0.4),
@@ -62,6 +62,10 @@ franka_2 = scene.add_entity(
 )
 ########################## build ##########################
 scene.build()
+scene.step()
+input()
+
+
 rgb = cam.render(rgb=True)
 cam.start_recording()
 
